@@ -113,7 +113,8 @@ def main():
                 name = i.name.split(".")[0]
                 gml = dir.joinpath(name)
 
-                x = subprocess.run([solver, 
+                try:
+                    x = subprocess.run([solver, 
                                     "-f",
                                     i,
                                     "-F",
@@ -124,7 +125,11 @@ def main():
                                     str(1),
                                     "-o",
                                     gml],
-                    capture_output=True)
+                    capture_output=True,
+                    timeout=1800)
+                except TimeoutError:
+                    f.write(name + "\t" + "ERR")
+                
                 optimality = codecs.decode(x.stdout, 'UTF-8')
                 i.unlink()
                 f.write(name + "\t" + optimality)
