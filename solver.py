@@ -1,6 +1,10 @@
 import pathlib 
 import networkx as nx
 import tempfile 
+import os
+import sys
+import subprocess
+import codecs
 
 def read_gr(file):
     tmp = tempfile.TemporaryFile(mode = 'w+')
@@ -66,10 +70,23 @@ def to_sif(file, tmp):
             values = i.rstrip().split(" ")
             f.write("{:d} xx {:d}\n".format(int(values[0]), int(values[1])))
 
+def gml_to_list(path):
+    for i in path.glob('**/*.gml'):
+        g = nx.read_gml(i)
+        dir = pathlib.Path(i).parent.absolute()
+        name = i.name.split(".")[0]
+        target = pathlib.Path(dir.joinpath(name))
+        
+        with target.open("w+") as f:
+            for (u, v) in g.edges(data=False):
+                f.write("{:d} {:d}\n".format(int(u), int(v)))
+        i.unlink()
+            
 
 def main():
     path = pathlib.Path.cwd().joinpath('test')
 
+    #convert to sif
     for i in path.glob('**/*.*'):
         if i.suffixes[0] == ".gr":
             read_gr(i)   
@@ -78,5 +95,42 @@ def main():
         elif i.suffixes[0] == ".td":
             i.unlink()
 
+    #check for yoshiko
+    solver = pathlib.Path.cwd().joinpath('yoshiko')
+    if not os.path.isfile(solver):
+        sys.exit("Error: binary not found: " + str(solver))
+
+    #solve and store solution complexity
+    optima = pathlib.Path.cwd().joinpath('test', 'optimum.txt')
+    with optima.open("w+") as f:
+        f.write("<file>\t<complexity>\n")
+        for i in path.glob('**/*.sif'):
+            #solver cant solve empty files
+            if os.stat(i).st_size == 0:
+                i.unlink()
+            else:
+                dir = pathlib.Path(i).parent.absolute()
+                name = i.name.split(".")[0]
+                gml = dir.joinpath(name)
+
+                x = subprocess.run([solver, 
+                                    "-f",
+                                    i,
+                                    "-F",
+                                    str(1),
+                                    "-O",
+                                    str(2),
+                                    "-v",
+                                    str(1),
+                                    "-o",
+                                    gml],
+                    capture_output=True)
+                optimality = codecs.decode(x.stdout, 'UTF-8')
+                i.unlink()
+                f.write(name + "\t" + optimality)
+    
+    gml_to_list(path)
+                
+            
 if __name__ == "__main__":
    main()
