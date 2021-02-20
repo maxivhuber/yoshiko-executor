@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 import codecs
+from datetime import datetime
 
 def read_gr(file):
     tmp = tempfile.TemporaryFile(mode = 'w+')
@@ -43,7 +44,7 @@ def read_gr(file):
 
     tmp.seek(0)
 
-    if n == exp_n and not 0 and m == exp_m and not 0 or n < exp_n and m == exp_m: 
+    if n == exp_n and m == exp_m or n < exp_n and m == exp_m: 
     #only if valid
         to_sif(file, tmp)
 
@@ -103,7 +104,7 @@ def main():
     #solve and store solution complexity
     optima = pathlib.Path.cwd().joinpath('test', 'optimum.txt')
     with optima.open("w+") as f:
-        f.write("<file>\t<complexity>\n")
+        f.write("<file>\t<complexity>\t<time>\n")
         for i in path.glob('**/*.sif'):
             #solver cant solve empty files
             if os.stat(i).st_size == 0:
@@ -130,16 +131,17 @@ def main():
                 try:
                     outs, errs = proc.communicate(timeout=1800)
                     optimality = codecs.decode(outs, 'UTF-8')
-                    f.write(name + "\t" + optimality)
+                    now = datetime.now()
+                    msg = "{}\t{}\t{}".format(name.strip(),optimality.strip(),now.strftime("%H:%M:%S"))
+                    f.write(msg + '\n')
                     i.unlink()
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     outs, errs = proc.communicate()
-                    f.write(name + "\t" + "ERR")
-                
-                
-                
-                
+                    now = datetime.now()
+                    msg = "{}\t{}\t{}".format(name.strip(),"ERR",now.strftime("%H:%M:%S"))
+                    f.write(msg + '\n')
+                       
     
     gml_to_list(path)
                 
