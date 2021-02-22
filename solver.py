@@ -137,7 +137,6 @@ def main():
                     i.unlink()
                 except subprocess.TimeoutExpired:
                     proc.kill()
-                    outs, errs = proc.communicate()
                     now = datetime.now()
                     msg = "{}\t{}\t{}".format(name.strip(),"ERR",now.strftime("%H:%M:%S"))
                     f.write(msg + '\n')
