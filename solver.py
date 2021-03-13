@@ -123,7 +123,10 @@ def gml_to_list(path):
 
 
 def get_characteristics(graph):
-    return graph.size()
+    n_vertices = graph.number_of_nodes()
+    n_edges = graph.number_of_edges()
+    n_components = nx.number_connected_components(graph)
+    return (n_vertices, n_edges, n_components)
 
 
 def main():
@@ -154,7 +157,8 @@ def main():
     # solve and store important characteristics
     optima = pathlib.Path.cwd().joinpath('test', 'optimum.csv')
     with open(optima, 'a+') as f:
-        header = ['filename', 'n', 'k']
+        header = ['filename', 'n', 'k',
+                  'G(initial) = (V, E)', 'G(solution) = (V, E)', 'Components']
         writer = csv.DictWriter(f, fieldnames=header)
 
         if (optima.stat().st_size == 0):
@@ -199,30 +203,32 @@ def main():
                     end = time.time()
 
                     # "solution" points now to graph in dict
-                    # read into networkx and compute for csv:
-                    # count of vertices + edges
-                    # count of clusters
-                    graph = graphs.get(str(solution))
-                    ig = get_characteristics(graph)
+                    graph_init = graphs.get(str(solution))
+                    ig = get_characteristics(graph_init)
 
                     # "gml" points to solution file
-                    # read into networkx and compute for csv:
-                    # count of vertices + edges
-                    # count of clusters
-                    graph = nx.read_gml(gml)
-                    og = get_characteristics(graph)
+                    graph_sol = nx.read_gml(gml)
+                    og = get_characteristics(graph_sol)
 
                     complexity = codecs.decode(outs, 'UTF-8')
                     elapsed = end - start
                     writer.writerow({'filename': name.strip(),
                                      'n': elapsed,
-                                     'k': complexity.strip()})
+                                     'k': complexity.strip(),
+                                     'G(initial) = (V, E)': 'G = ({}, {})'.format(ig[0], ig[1]),
+                                     'G(solution) = (V, E)': 'G = ({}, {})'.format(og[0], og[1]),
+                                     'Components': og[2]})
                     i.unlink()
                 except subprocess.TimeoutExpired:
                     proc.kill()
+                    graph_init = graphs.get(str(solution))
+                    ig = get_characteristics(graph_init)
                     writer.writerow({'filename': name.strip(),
                                      'n': "Err",
-                                     'k': "Err"})
+                                     'k': "Err",
+                                     'G(initial) = (V, E)': 'G = ({}, {})'.format(ig[0], ig[1]),
+                                     'G(solution) = (V, E)': 'Err',
+                                     'Components': ig[2]})
 
     gml_to_list(path)
 
