@@ -1,6 +1,5 @@
 import pathlib
 import networkx as nx
-import pygraphviz as pgv
 import tempfile
 import sys
 import subprocess
@@ -116,8 +115,6 @@ def gml_to_list(path):
         dir = pathlib.Path(i).parent.absolute()
         name = i.name.split(".")[0]
         target = pathlib.Path(dir.joinpath(name))
-        img = pathlib.Path(dir.joinpath(name + "_solution.png"))
-        graph_writer(g, img)
 
         with target.open("w+") as f:
             for (u, v) in g.edges(data=False):
@@ -132,12 +129,8 @@ def get_characteristics(graph):
     return (n_vertices, n_edges, n_components)
 
 
-def graph_writer(graph, path):
-    G = nx.nx_agraph.to_agraph(graph)
-    G.draw(path, format="png", prog="fdp")
-
-
 def main():
+
     # check for yoshiko
     solver = pathlib.Path.cwd().joinpath('yoshiko')
     if not solver.is_file():
@@ -146,24 +139,17 @@ def main():
     path = pathlib.Path.cwd().joinpath('test')
     graphs = {}
 
-    # search for .gr and .graph6 files and convert to .sif
+    # convert to .sif
     for i in path.glob('**/*.*'):
         if i.suffix == ".gr":
             g = read_gr(i)
             if isinstance(g, nx.classes.graph.Graph):
                 graphs.update({str(i.with_suffix('')): g})
-                # plot initial graph from .gr
-                dir = pathlib.Path(i).parent.absolute()
-                name = i.name.split(".")[0]
-                target = pathlib.Path(dir.joinpath(name + '_initial.png'))
-                if not target.exists():
-                    graph_writer(g, target)
 
         elif i.suffix == ".graph6":
             g = read_graph6(i)
             if isinstance(g, nx.classes.graph.Graph):
                 graphs.update({str(i.with_suffix('')): g})
-                # plot initial graph from .graph6
 
         elif i.suffix == ".td":
             i.unlink()
@@ -180,7 +166,6 @@ def main():
 
         cpu = multiprocessing.cpu_count() - 2
 
-        # solve earlier created .sif files
         for i in path.glob('**/*.sif'):
             # solver cant solve empty files
             if i.stat().st_size == 0:
@@ -214,7 +199,7 @@ def main():
 
                 try:
                     start = time.time()
-                    outs, errs = proc.communicate(timeout=1)
+                    outs, errs = proc.communicate(timeout=1800)
                     end = time.time()
 
                     # "solution" points now to graph in dict
