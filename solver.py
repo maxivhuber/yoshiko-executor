@@ -219,6 +219,7 @@ def main():
                                      'G(solution) = (V, E)': 'G = ({}, {})'.format(og[0], og[1]),
                                      'Components': og[2]})
                     i.unlink()
+
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     graph_init = graphs.get(str(solution))
@@ -229,7 +230,7 @@ def main():
                                      'G(initial) = (V, E)': 'G = ({}, {})'.format(ig[0], ig[1]),
                                      'G(solution) = (V, E)': 'Err',
                                      'Components': ig[2]})
-
+                    i.unlink()
     gml_to_list(path)
 
 
