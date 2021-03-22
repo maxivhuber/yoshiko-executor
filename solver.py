@@ -176,6 +176,8 @@ def main():
 
     # solve and store important characteristics
     optima = pathlib.Path.cwd().joinpath('test', 'optimum.csv')
+    if not optima.exists():
+        optima.touch()
     with open(optima, 'a+') as f:
         header = ['filename', 'n', 'k',
                   'G(initial) = (V, E)', 'G(solution) = (V, E)', 'Components']
