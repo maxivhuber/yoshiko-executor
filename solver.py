@@ -225,6 +225,12 @@ def main():
                     outs, errs = proc.communicate(timeout=1800)
                     end = time.time()
 
+                    # memory error
+                    if proc.returncode == -9:
+                        sys.stderr.write(
+                            'CPLEX error 1001: out of memory: ' + str(i))
+                        raise Exception
+
                     # "solution" points now to graph in dict
                     graph_init = graphs.get(str(solution))
                     ig = get_characteristics(graph_init)
@@ -242,8 +248,7 @@ def main():
                                      'G(solution) = (V, E)': 'G = ({}, {})'.format(og[0], og[1]),
                                      'Components': og[2]})
                     i.unlink()
-
-                except subprocess.TimeoutExpired:
+                except (subprocess.TimeoutExpired, Exception):
                     proc.kill()
                     graph_init = graphs.get(str(solution))
                     ig = get_characteristics(graph_init)
