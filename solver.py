@@ -220,7 +220,7 @@ def main():
 
                 try:
                     start = time.time()
-                    outs, _errs = proc.communicate(timeout=1)
+                    outs, _errs = proc.communicate(timeout=1800)
                     end = time.time()
 
                     # memory error
