@@ -97,7 +97,7 @@ def read_graph6(file):
 def to_sif(file, tmp):
     name = file.name.split(".")[0]
     path = pathlib.Path(file).parent.absolute()
-    solution = path.joinpath(name)
+    solution = path.joinpath(name + ".txt")
 
     # dont create .sif file if solution file already exists
     if(not solution.exists()):
@@ -108,21 +108,6 @@ def to_sif(file, tmp):
                 values = codecs.decode(i, "UTF-8").rstrip().split(" ")
                 f.write("{:d} xx {:d}\n".format(
                     int(values[0]), int(values[1])))
-
-
-def gml_to_list(path):
-    for i in path.glob('**/*.gml'):
-        g = nx.read_gml(i)
-        dir = pathlib.Path(i).parent.absolute()
-        name = i.name.split(".")[0]
-        target = pathlib.Path(dir.joinpath(name))
-        img = pathlib.Path(dir.joinpath(name + "_solution.png"))
-        graph_writer(g, img)
-
-        with target.open("w+") as f:
-            for (u, v) in g.edges(data=False):
-                f.write("{} {}\n".format(u, v))
-        i.unlink()
 
 
 def get_characteristics(graph):
@@ -137,6 +122,16 @@ def graph_writer(graph, path):
     G.draw(path, format="png", prog="fdp")
 
 
+def reconstructor(path):
+    G = nx.Graph()
+    with path.open() as f:
+        for i in f.readlines():
+            cluster = i.split()
+            H = nx.complete_graph(len(cluster))
+            G = nx.disjoint_union(G, H)
+    return G
+
+
 def main():
 
     # check for yoshiko
@@ -144,6 +139,7 @@ def main():
     if not solver.is_file():
         sys.exit("Err: binary not found: " + str(solver))
 
+    # specify directory to solve recursively
     path = pathlib.Path.cwd().joinpath('test')
     graphs = {}
 
@@ -175,12 +171,14 @@ def main():
             i.unlink()
 
     # solve and store important characteristics
-    optima = pathlib.Path.cwd().joinpath('test', 'optimum.csv')
+    optima = pathlib.Path.cwd().joinpath('optimum.csv')
     if not optima.exists():
         optima.touch()
     with open(optima, 'a+') as f:
         header = ['filename', 'n', 'k',
-                  'G(initial) = (V, E)', 'G(solution) = (V, E)', 'Components']
+                  'G(initial) = (V, E)', 'G(solution) = (V, E)',
+                  'Components(initial)', 'Components(solution)',
+                  'Δ']
         writer = csv.DictWriter(f, fieldnames=header)
 
         if (optima.stat().st_size == 0):
@@ -202,7 +200,7 @@ def main():
                 # as Pathlib.path: Path to yoshiko solution
                 solution = dir.joinpath(name)
                 # path to solution file
-                gml = solution.with_suffix('.gml')
+                clusters = solution.with_suffix('.csv')
 
                 proc = subprocess.Popen([solver,
                                          "-f",
@@ -210,7 +208,7 @@ def main():
                                          "-F",
                                          str(1),
                                          "-O",
-                                         str(2),
+                                         str(0),
                                          "-v",
                                          str(1),
                                          "-threads",
@@ -222,7 +220,7 @@ def main():
 
                 try:
                     start = time.time()
-                    outs, errs = proc.communicate(timeout=1800)
+                    outs, _errs = proc.communicate(timeout=1)
                     end = time.time()
 
                     # memory error
@@ -235,8 +233,8 @@ def main():
                     graph_init = graphs.get(str(solution))
                     ig = get_characteristics(graph_init)
 
-                    # "gml" points to solution file
-                    graph_sol = nx.read_gml(gml)
+                    # "csv" points to solution file, containing all clusters
+                    graph_sol = reconstructor(clusters)
                     og = get_characteristics(graph_sol)
 
                     complexity = codecs.decode(outs, 'UTF-8')
@@ -246,7 +244,18 @@ def main():
                                      'k': complexity.strip(),
                                      'G(initial) = (V, E)': 'G = ({}, {})'.format(ig[0], ig[1]),
                                      'G(solution) = (V, E)': 'G = ({}, {})'.format(og[0], og[1]),
-                                     'Components': og[2]})
+                                     'Components(initial)': ig[2],
+                                     'Components(solution)': og[2],
+                                     'Δ': abs(ig[1] - og[1])})
+                    # save solution graph as edgelist
+                    target_txt = pathlib.Path(
+                        dir.joinpath(name + '.txt'))
+                    nx.write_edgelist(graph_sol, target_txt)
+                    # create image of solution
+                    target_png = pathlib.Path(
+                        dir.joinpath(name + '_solution.png'))
+                    graph_writer(graph_sol, target_png)
+                    # remove .sif file
                     i.unlink()
                 except (subprocess.TimeoutExpired, Exception):
                     proc.kill()
@@ -257,9 +266,13 @@ def main():
                                      'k': "Err",
                                      'G(initial) = (V, E)': 'G = ({}, {})'.format(ig[0], ig[1]),
                                      'G(solution) = (V, E)': 'Err',
-                                     'Components': ig[2]})
+                                     'Components(initial)': ig[2],
+                                     'Components(solution)': 'Err',
+                                     'Δ': 'Err'})
                     i.unlink()
-    gml_to_list(path)
+
+    for file in path.glob('**/*.csv'):
+        file.unlink()
 
 
 if __name__ == "__main__":
