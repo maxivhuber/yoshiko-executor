@@ -10,6 +10,7 @@ import multiprocessing
 import csv
 import re
 import random
+import json
 from datetime import datetime
 
 
@@ -124,40 +125,47 @@ def graph_writer(graph, path):
     G.draw(path, format="png", prog="fdp")
 
 
-def reconstructor(path, img):
+def reconstructor(path, img, vertex):
     G = nx.Graph()
     # key: cluster number, value: vertices
     cluster = {}
-
     with path.open() as f:
         text = f.read().replace('\n', '')
         result = re.findall(r"node \[(.*?)\]", str(text))
         for node in result:
             data = node.replace("\"", "").split()
-            color = ''
+            hexcolor = ''
             colors = []
+            jdata = []
             if cluster.get(data[5]) == None:
                 while True:
-                    rand = random.randint(0, 16777215)
-                    color = str(hex(rand))
-                    color = '#{}'.format(color[2:])
-                    if not color in colors:
-                        colors.append(color)
+                    rand = random.randint(0x111111, 0xFFFFFF)
+                    hexcolor = format(rand, 'x')
+                    hexcolor = '#{}'.format(hexcolor)
+                    if not hexcolor in colors:
+                        colors.append(hexcolor)
                         break
 
-                cluster[data[5]] = ([int(data[3])], color)
+                cluster[data[5]] = ([int(data[3])], hexcolor)
             else:
                 cluster.get(data[5])[0].append(int(data[3]))
 
     for key in cluster:
         nodes = cluster.get(key)[0]
         color = cluster.get(key)[1]
+
+        # build json object
+        jdata.append((nodes, color))
+
         G.add_nodes_from(nodes, node_color=color)
         for x in nodes:
             for y in nodes:
                 if not x == y and y > x:
                     G.add_edge(x, y)
 
+    # write json object
+    f = open(vertex, 'w')
+    f.write(json.dumps(jdata))
     color_map = []
     for node in G:
         color = G.nodes[node].get('node_color')
@@ -170,7 +178,6 @@ def reconstructor(path, img):
 
 
 def main():
-
     # check for yoshiko
     solver = pathlib.Path.cwd().joinpath('yoshiko')
     if not solver.is_file():
@@ -273,8 +280,11 @@ def main():
                     # "csv" points to solution file, containing all clusters
                     target_png = pathlib.Path(
                         dir.joinpath(name + '_solution.png'))
+                    vertex_info = pathlib.Path(
+                        dir.joinpath('.' + name).with_suffix('.json'))
                     # build graph based on gml, color and plot it to target_png
-                    graph_sol = reconstructor(clusters, target_png)
+                    graph_sol = reconstructor(
+                        clusters, target_png, vertex_info)
                     og = get_characteristics(graph_sol)
 
                     complexity = codecs.decode(outs, 'UTF-8')
