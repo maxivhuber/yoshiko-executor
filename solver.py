@@ -1,6 +1,6 @@
 import pathlib
 import networkx as nx
-import pygraphviz as pgv
+import matplotlib.pyplot as plt
 import tempfile
 import sys
 import subprocess
@@ -8,6 +8,8 @@ import codecs
 import time
 import multiprocessing
 import csv
+import re
+import random
 from datetime import datetime
 
 
@@ -122,13 +124,48 @@ def graph_writer(graph, path):
     G.draw(path, format="png", prog="fdp")
 
 
-def reconstructor(path):
+def reconstructor(path, img):
     G = nx.Graph()
+    # key: cluster number, value: vertices
+    cluster = {}
+
     with path.open() as f:
-        for i in f.readlines():
-            cluster = i.split()
-            H = nx.complete_graph(len(cluster))
-            G = nx.disjoint_union(G, H)
+        text = f.read().replace('\n', '')
+        result = re.findall(r"node \[(.*?)\]", str(text))
+        for node in result:
+            data = node.replace("\"", "").split()
+            color = ''
+            colors = []
+            if cluster.get(data[5]) == None:
+                while True:
+                    rand = random.randint(0, 16777215)
+                    color = str(hex(rand))
+                    color = '#{}'.format(color[2:])
+                    if not color in colors:
+                        colors.append(color)
+                        break
+
+                cluster[data[5]] = ([int(data[3])], color)
+            else:
+                cluster.get(data[5])[0].append(int(data[3]))
+
+    for key in cluster:
+        nodes = cluster.get(key)[0]
+        color = cluster.get(key)[1]
+        G.add_nodes_from(nodes, node_color=color)
+        for x in nodes:
+            for y in nodes:
+                if not x == y and y > x:
+                    G.add_edge(x, y)
+
+    color_map = []
+    for node in G:
+        color = G.nodes[node].get('node_color')
+        color_map.append(color)
+
+    pos = nx.nx_agraph.graphviz_layout(G, prog="fdp")
+    nx.draw_networkx(G, with_labels=True, pos=pos, node_color=color_map)
+    plt.savefig(img)
     return G
 
 
@@ -200,7 +237,7 @@ def main():
                 # as Pathlib.path: Path to yoshiko solution
                 solution = dir.joinpath(name)
                 # path to solution file
-                clusters = solution.with_suffix('.csv')
+                clusters = solution.with_suffix('.gml')
 
                 proc = subprocess.Popen([solver,
                                          "-f",
@@ -208,7 +245,7 @@ def main():
                                          "-F",
                                          str(1),
                                          "-O",
-                                         str(0),
+                                         str(2),
                                          "-v",
                                          str(1),
                                          "-threads",
@@ -226,7 +263,7 @@ def main():
                     # memory error
                     if proc.returncode == -9:
                         sys.stderr.write(
-                            'CPLEX error 1001: out of memory: ' + str(i))
+                            'CPLEX error 1001: out of memory: {}\n'.format(str(i)))
                         raise Exception
 
                     # "solution" points now to graph in dict
@@ -234,7 +271,10 @@ def main():
                     ig = get_characteristics(graph_init)
 
                     # "csv" points to solution file, containing all clusters
-                    graph_sol = reconstructor(clusters)
+                    target_png = pathlib.Path(
+                        dir.joinpath(name + '_solution.png'))
+                    # build graph based on gml, color and plot it to target_png
+                    graph_sol = reconstructor(clusters, target_png)
                     og = get_characteristics(graph_sol)
 
                     complexity = codecs.decode(outs, 'UTF-8')
@@ -251,10 +291,6 @@ def main():
                     target_txt = pathlib.Path(
                         dir.joinpath(name + '.txt'))
                     nx.write_edgelist(graph_sol, target_txt)
-                    # create image of solution
-                    target_png = pathlib.Path(
-                        dir.joinpath(name + '_solution.png'))
-                    graph_writer(graph_sol, target_png)
                     # remove .sif file
                     i.unlink()
                 except (subprocess.TimeoutExpired, Exception):
@@ -271,7 +307,7 @@ def main():
                                      'Δ': 'Err'})
                     i.unlink()
 
-    for file in path.glob('**/*.csv'):
+    for file in path.glob('**/*.gml'):
         file.unlink()
 
 
