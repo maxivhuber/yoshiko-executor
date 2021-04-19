@@ -174,6 +174,7 @@ def reconstructor(path, img, vertex):
     pos = nx.nx_agraph.graphviz_layout(G, prog="fdp")
     nx.draw_networkx(G, with_labels=True, pos=pos, node_color=color_map)
     plt.savefig(img)
+    plt.clf()
     return G
 
 
